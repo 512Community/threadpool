@@ -36,8 +36,8 @@ struct task_queue_info {
 /*线程池管理*/
 struct threadpool {
 #define POOL(ptr, type, number) ((ptr)->type##_info.number)
-#define MIN_WAIT_TASK_NUM 10			/* 当任务数超过了它，就该添加新线程了*/
-#define DEFAULT_THREAD_NUM 10			/* 每次创建或销毁的线程个数*/
+#define MIN_WAIT_TASK_NUM 1000			/* 当任务数超过了它，就该添加新线程了*/
+#define DEFAULT_THREAD_NUM 100			/* 每次创建或销毁的线程个数*/
 
 	pthread_mutex_t mutex;			/* 锁住整个结构体 */
 	pthread_mutex_t busy_thr_num_mutex;	/* 用于使用忙线程数时的锁 */
@@ -223,54 +223,51 @@ static void *admin_thread(void *threadpool)
 	int i, add;
 	unsigned int queue_size;
 	unsigned int live_thr_num;
+	unsigned int max_thr_num;
 	unsigned int busy_thr_num;
 
 	struct threadpool *pool = threadpool;
 	while (!pool->shutdown) {
-
 		pthread_mutex_lock(&(pool->mutex));
 		queue_size = POOL(pool, queue, size);
 		live_thr_num = POOL(pool, thread, live_num);
+		max_thr_num = POOL(pool, thread, max_num);
 		pthread_mutex_unlock(&(pool->mutex));
 
 		pthread_mutex_lock(&(pool->busy_thr_num_mutex));
 		busy_thr_num = POOL(pool, thread, busy_num);
 		pthread_mutex_unlock(&(pool->busy_thr_num_mutex));
 
-		ESLOG_INFO("admin busy live -%d--%d-\n", busy_thr_num, live_thr_num);
-		ESLOG_INFO("admin queue_size -%d\n", queue_size);
-
-		/*创建新线程 实际任务数量大于 最小正在等待的任务数量，存活线程数小于最大线程数*/
-		if (queue_size >= MIN_WAIT_TASK_NUM && live_thr_num < POOL(pool, thread, max_num)) {
-			ESLOG_INFO("admin add-----------\n");
-
+		/*创建新线程,实际任务数量大于 最小正在等待的任务数量，存活线程数小于最大线程数*/
+		if (queue_size >= MIN_WAIT_TASK_NUM && live_thr_num < max_thr_num) {
 			pthread_mutex_lock(&(pool->mutex));
 			add = 0;
 
 			/*一次增加 DEFAULT_THREAD_NUM 个线程*/
 			for (i = 0; add < DEFAULT_THREAD_NUM; i++) {
+				if (POOL(pool, thread, live_num) > max_thr_num)
+					break;
 
-				if (i < POOL(pool, thread, max_num) && POOL(pool, thread, live_num) < POOL(pool, thread, max_num))
+				if (i > max_thr_num)
 					break;
 
 				if (pool->threads[i] == 0 || !is_thread_alive(pool->threads[i])) {
 					if (pthread_create(&(pool->threads[i]), NULL, threadpool_thread, (void *)pool)) {
 						ESLOG_ERR("pthread create false\n");
+						pthread_mutex_unlock(&(pool->mutex));
 						return NULL;
 					}
 
 					add++;
 					POOL(pool, thread, live_num)++;
-					ESLOG_INFO("new thread -----------------------\n");
 				}
 			}
-
 			pthread_mutex_unlock(&(pool->mutex));
 		}
 
 		/*销毁多余的线程 忙线程x2 都小于 存活线程，并且存活的大于最小线程数*/
 		if ((busy_thr_num * 2) < live_thr_num  &&  live_thr_num > POOL(pool, thread, min_num)) {
-			ESLOG_INFO("admin busy --%d--%d----\n", busy_thr_num, live_thr_num);
+			ESLOG_INFO("admin busy:%d live:%d----\n", busy_thr_num, live_thr_num);
 			/*一次销毁DEFAULT_THREAD_NUM个线程*/
 			pthread_mutex_lock(&(pool->mutex));
 			POOL(pool, thread, exit_num) = DEFAULT_THREAD_NUM;
@@ -305,20 +302,20 @@ static void *threadpool_thread(void *threadpool)
 	for (;;) {
 		pthread_mutex_lock(&pool->mutex);
 
-		//无任务则阻塞在 任务队列不为空 上，有任务则跳出
-		while ((POOL(pool, queue, size) == 0) && (!pool->shutdown)) { 
+		//无任务等待，有任务则跳出
+		while (!(POOL(pool, queue, size) | pool->shutdown)) {
 			ESLOG_INFO("thread 0x%x is waiting \n", (unsigned int)pthread_self());
 			pthread_cond_wait(&(pool->queue_not_empty), &(pool->mutex));
 
 			//判断是否需要清除线程,自杀功能
-			ESLOG_INFO("exit_num:%d\n", POOL(pool, thread, exit_num));
 			if (POOL(pool, thread, exit_num) > 0) {
+				ESLOG_INFO("exit_num:%d\n", POOL(pool, thread, exit_num));
 				POOL(pool, thread, exit_num)--;
 				//判断线程池中的线程数是否大于最小线程数，是则结束当前线程
 				if (POOL(pool, thread, live_num) > POOL(pool, thread, min_num)) {
 					ESLOG_INFO("thread 0x%x is exiting \n", (unsigned int)pthread_self());
 					POOL(pool, thread, live_num)--;
-					break;
+					goto out;
 				}
 			}
 		}
@@ -326,7 +323,7 @@ static void *threadpool_thread(void *threadpool)
 		//线程池开关状态
 		if (pool->shutdown) {
 			ESLOG_INFO("shutdown true 0x%x \n", (unsigned int)pthread_self());
-			break;
+			goto out;
 		}
 
 		//否则该线程可以拿出任务
@@ -357,6 +354,7 @@ static void *threadpool_thread(void *threadpool)
 		POOL(pool, thread, busy_num)--;
 		pthread_mutex_unlock(&pool->busy_thr_num_mutex);
 	}
+out:
 
 	pthread_mutex_unlock(&(pool->mutex));
 
