@@ -7,7 +7,6 @@
 #include <msg_log.h>
 #include <thread_pool.h>
 
-#define DEFAULT_TIME 1	/*默认时间10s*/
 #define true 1
 #define false 0
 
@@ -164,9 +163,8 @@ int threadpool_add_task(void *_pool, void *(*function)(void *arg), void *arg)
 	queue_max_size = POOL(pool, queue, max_size);
 
 	/*如果队列满了,调用wait阻塞*/
-	while ((POOL(pool, queue, size) == queue_max_size) && (!pool->shutdown)) {
+	while ((POOL(pool, queue, size) == queue_max_size) && (!pool->shutdown))
 		pthread_cond_wait(&(pool->queue_not_full), &(pool->mutex));
-	}
 
 	if (pool->shutdown) {
 		pthread_mutex_unlock(&(pool->mutex));
@@ -229,9 +227,7 @@ static void *admin_thread(void *threadpool)
 
 	struct threadpool *pool = threadpool;
 	while (!pool->shutdown) {
-		ESLOG_INFO("admin -----------------\n");
 
-		sleep(DEFAULT_TIME);
 		pthread_mutex_lock(&(pool->mutex));
 		queue_size = POOL(pool, queue, size);
 		live_thr_num = POOL(pool, thread, live_num);
@@ -252,11 +248,11 @@ static void *admin_thread(void *threadpool)
 			add = 0;
 
 			/*一次增加 DEFAULT_THREAD_NUM 个线程*/
-			for (i = 0;
-			     i < POOL(pool, thread, max_num) && 
-			     add < DEFAULT_THREAD_NUM &&
-			     POOL(pool, thread, live_num) < POOL(pool, thread, max_num);
-			     i++) {
+			for (i = 0; add < DEFAULT_THREAD_NUM; i++) {
+
+				if (i < POOL(pool, thread, max_num) && POOL(pool, thread, live_num) < POOL(pool, thread, max_num))
+					break;
+
 				if (pool->threads[i] == 0 || !is_thread_alive(pool->threads[i])) {
 					if (pthread_create(&(pool->threads[i]), NULL, threadpool_thread, (void *)pool)) {
 						ESLOG_ERR("pthread create false\n");

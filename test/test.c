@@ -10,6 +10,7 @@ void *test(void *arg)
 	pthread_mutex_lock(&mutex);
 	printf("hello world:%d\n", num);
 	num++;
+	usleep(1000);
 	pthread_mutex_unlock(&mutex);
 }
 
@@ -19,7 +20,7 @@ int main(int argc, const char *argv[])
 	void *pool;
 	int i;
 
-	rc = threadpool_create(&pool, 10, 100, 100);
+	rc = threadpool_create(&pool, 100, 10000, 10000);
 	if (rc < 0) {
 		printf("threadpool_create false\n");
 		return -1;
