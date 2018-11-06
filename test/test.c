@@ -1,9 +1,16 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <thread_pool.h>
+#include <pthread.h>
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+int num = 0;
 void *test(void *arg)
 {
-	printf("hello world\n");
+	pthread_mutex_lock(&mutex);
+	printf("hello world:%d\n", num);
+	num++;
+	pthread_mutex_unlock(&mutex);
 }
 
 int main(int argc, const char *argv[])
@@ -12,24 +19,22 @@ int main(int argc, const char *argv[])
 	void *pool;
 	int i;
 
-	rc = threadpool_create(&pool, 0, 50, 10);
+	rc = threadpool_create(&pool, 10, 100, 100);
 	if (rc < 0) {
 		printf("threadpool_create false\n");
 		return -1;
 	}
 
-	for (i = 0; i < 100; i++) {
+	for (i = 0; i < 10000; i++) {
 		rc = threadpool_add_task(pool, test, NULL);
 		if (rc < 0) {
 			printf("threadpool_create false\n");
 			return -1;
 		}
 
-		printf("i:%d\n", i);
-
 	}
 	
-	threadpool_destroy(pool);
+	threadpool_destroy(pool, FLAGS_WAIT_TASK_EXIT);
 
 	return 0;
 }

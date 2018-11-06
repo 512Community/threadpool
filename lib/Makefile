@@ -1,7 +1,8 @@
 CC=gcc
 CXX=g++
 
-CFLAGS=-Werror -g -fPIC -DDEBUG_LOG
+#CFLAGS=-Werror -g -fPIC -DDEBUG_LOG
+CFLAGS=-Werror -g -fPIC
 
 OBJ+= $(patsubst %.c, %.o, $(wildcard ./*.c))
 
