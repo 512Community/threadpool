@@ -20,7 +20,7 @@ int main(int argc, const char *argv[])
 	void *pool;
 	int i;
 
-	rc = threadpool_create(&pool, 100, 10000, 10000);
+	rc = threadpool_create(&pool, 0, 100, 1000, 10000);
 	if (rc < 0) {
 		printf("threadpool_create false\n");
 		return -1;
