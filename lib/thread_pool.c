@@ -241,7 +241,7 @@ static void *admin_thread(void *threadpool)
 		ESLOG_INFO("admin queue_size -%d\n", queue_size);
 
 		/*创建新线程 实际任务数量大于 最小正在等待的任务数量，存活线程数小于最大线程数*/
-		if (queue_size >= MIN_WAIT_TASK_NUM && live_thr_num <= POOL(pool, thread, max_num)) {
+		if (queue_size >= MIN_WAIT_TASK_NUM && live_thr_num < POOL(pool, thread, max_num)) {
 			ESLOG_INFO("admin add-----------\n");
 
 			pthread_mutex_lock(&(pool->mutex));
