@@ -35,6 +35,7 @@ int main(int argc, const char *argv[])
 
 	}
 	
+	sleep(20);
 	threadpool_destroy(pool, FLAGS_WAIT_TASK_EXIT);
 
 	return 0;
