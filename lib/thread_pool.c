@@ -185,10 +185,8 @@ int threadpool_add_task(void *_pool, void *(*function)(void *arg), void *arg)
 	while ((POOL(pool, queue, size) == queue_max_size) && (!pool->shutdown))
 		PTHREAD_ERR(pthread_cond_wait(&pool->queue_not_full, &pool->mutex), out);
 
-	if (pool->shutdown) {
-		PTHREAD_ERR(pthread_mutex_unlock(&pool->mutex), out);
-		return -1;
-	}
+	if (pool->shutdown)
+		goto out;
 
 	/*清空工作线程的回调函数的参数arg*/
 	if (pool->task_queue[queue_rear].arg) {
