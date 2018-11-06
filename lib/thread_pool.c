@@ -36,8 +36,8 @@ struct task_queue_info {
 /*线程池管理*/
 struct threadpool {
 #define POOL(ptr, type, number) ((ptr)->type##_info.number)
-#define MIN_WAIT_TASK_NUM 10			/*当任务数超过了它，就该添加新线程了*/
-#define DEFAULT_THREAD_NUM 10			/*每次创建或销毁的线程个数*/
+#define MIN_WAIT_TASK_NUM 10			/* 当任务数超过了它，就该添加新线程了*/
+#define DEFAULT_THREAD_NUM 10			/* 每次创建或销毁的线程个数*/
 
 	pthread_mutex_t mutex;			/* 锁住整个结构体 */
 	pthread_mutex_t busy_thr_num_mutex;	/* 用于使用忙线程数时的锁 */
@@ -258,7 +258,6 @@ static void *admin_thread(void *threadpool)
 						ESLOG_ERR("pthread create false\n");
 						return NULL;
 					}
-					pthread_detach(pool->threads[i]);
 
 					add++;
 					POOL(pool, thread, live_num)++;
