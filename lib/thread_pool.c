@@ -8,13 +8,6 @@
 #include <msg_log.h>
 #include <thread_pool.h>
 
-#ifndef true
-#define true 1
-#endif
-#ifndef false
-#define false 0
-#endif
-
 #define PTHREAD_ERR(func, loop) do { \
 	if(func) { 	\
 		ESLOG_ERR(#func " failed:%d\n", errno);\
@@ -70,7 +63,6 @@ struct threadpool {
 static void *threadpool_thread(void *threadpool);
 static int threadpool_free(struct threadpool **__pool);
 static void *admin_thread(void *threadpool);
-static int is_thread_alive(pthread_t tid);
 static int thread_create(struct threadpool *threadpool);
 static int thread_destory(struct threadpool *threadpool);
 
@@ -271,7 +263,7 @@ static int thread_create(struct threadpool *pool)
 			if (POOL(pool, thread, live_num) > max_thr_num)
 				break;
 
-			if (pool->threads[i] == 0 || !is_thread_alive(pool->threads[i])) {
+			if (pool->threads[i] == 0) {
 				PTHREAD_ERR(pthread_create(&(pool->threads[i]), NULL, threadpool_thread, (void *)pool), out);
 				add++;
 				POOL(pool, thread, live_num)++;
@@ -319,16 +311,6 @@ static int thread_destory(struct threadpool *pool)
 	return 0;
 out:
 	return -1;
-}
-
-static int is_thread_alive(pthread_t tid)
-{
-	int rc;
-	rc = pthread_kill(tid, 0);
-	if (rc == ESRCH)
-		return false;
-
-	return true;
 }
 
 static void *threadpool_thread(void *threadpool)
