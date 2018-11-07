@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
+#include <string.h>
 #include <msg_log.h>
 #include <thread_pool.h>
 
@@ -151,14 +152,8 @@ int threadpool_destroy(void *_pool, int flags)
 		while(POOL(pool, queue, size));
 
 	pool->shutdown = true;
-
-	PTHREAD_ERR(pthread_join(pool->admin_tid, NULL), out);
-
 	for (i = 0; i < POOL(pool, thread, live_num); i++)
 		PTHREAD_ERR(pthread_cond_broadcast(&(pool->queue_not_empty)), out);
-
-	for (i = 0; i < POOL(pool, thread, live_num); i++)
-		PTHREAD_ERR(pthread_join(pool->threads[i], NULL), out);
 
 	threadpool_free(&pool);
 	return 0;
@@ -240,7 +235,7 @@ static int threadpool_free(struct threadpool **__pool)
 /*管理线程*/
 static void *admin_thread(void *threadpool)
 {
-
+	pthread_detach(pthread_self());
 	struct threadpool *pool = threadpool;
 	while (!pool->shutdown) {
 		if(thread_create(pool) < 0)
@@ -338,9 +333,11 @@ static int is_thread_alive(pthread_t tid)
 
 static void *threadpool_thread(void *threadpool)
 {
+	unsigned int i;
 	struct threadpool *pool = threadpool;
 	struct threadpool_task task;
 
+	pthread_detach(pthread_self());
 	for (;;) {
 		pthread_mutex_lock(&pool->mutex);
 		//无任务等待，有任务则跳出
@@ -356,6 +353,12 @@ static void *threadpool_thread(void *threadpool)
 			//如果live的线程数大于min线程，则销毁掉.
 			if (POOL(pool, thread, live_num) > POOL(pool, thread, min_num)) {
 				POOL(pool, thread, live_num)--;
+				for (i = 0; i < POOL(pool, thread, max_num); i++) {
+					if(pthread_equal(pool->threads[i], pthread_self())) {
+						memset(pool->threads + i, 0, sizeof(pthread_t));
+						break;
+					}
+				}
 				goto out;
 			}
 		}
