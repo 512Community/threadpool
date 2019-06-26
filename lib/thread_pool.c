@@ -7,6 +7,7 @@
 #include <string.h>
 #include <msg_log.h>
 #include <thread_pool.h>
+#include <stdint.h>
 
 #define PTHREAD_ERR(func, loop) do { \
 	if(func) { 	\
@@ -97,7 +98,7 @@ int threadpool_create(void **__pool,
 	POOL(pool, queue, rear) = 0;
 	POOL(pool, queue, size) = 0;
 	POOL(pool, queue, max_size) = queue_max_size;
-	pool->shutdown = false;
+	pool->shutdown = 0;
 
 	pool->threads = calloc(max_thr_num, sizeof(pthread_t));
 	if (!pool->threads) {
@@ -143,7 +144,7 @@ int threadpool_destroy(void *_pool, int flags)
 	if(flags)
 		while(POOL(pool, queue, size));
 
-	pool->shutdown = true;
+	pool->shutdown = 1;
 	for (i = 0; i < POOL(pool, thread, live_num); i++)
 		PTHREAD_ERR(pthread_cond_broadcast(&(pool->queue_not_empty)), out);
 
